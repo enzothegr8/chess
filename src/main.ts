@@ -71,18 +71,73 @@ function isTextInputFocused(): boolean {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 }
 
-// Picking is never filtered: hoveredCell always reflects the nearest node to
-// the cursor across all N^3 cells, regardless of reachability or any other
-// display state, so a click here can select any node at any time.
-canvas.addEventListener('click', (e) => {
-  if (hoveredCell === null) return;
+// A click is a press and release on the same node with negligible movement
+// between them; anything else is a drag. Selection (and blocker toggling)
+// must never fire on a drag release, so both are decided here from pointer
+// deltas rather than from the 'click' event, which knows nothing about
+// movement. This also drives the camera: orbit/pan only start once the
+// drag threshold is crossed, so a slightly shaky click never nudges it.
+const MOUSE_DRAG_THRESHOLD = 5;
+const TOUCH_DRAG_THRESHOLD = 10;
 
-  if (e.shiftKey) {
-    board.toggleBlocker(hoveredCell);
-    return;
+let downX = 0;
+let downY = 0;
+let downButton = -1;
+let downCell: number | null = null;
+let downShift = false;
+let dragged = false;
+let dragThresholdSq = MOUSE_DRAG_THRESHOLD * MOUSE_DRAG_THRESHOLD;
+let dragMode: 'none' | 'orbit' | 'pan' = 'none';
+let lastX = 0;
+let lastY = 0;
+
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  downX = e.clientX;
+  downY = e.clientY;
+  lastX = downX;
+  lastY = downY;
+  downButton = e.button;
+  downCell = hoveredCell;
+  downShift = e.shiftKey;
+  dragged = false;
+  const threshold = e.pointerType === 'touch' ? TOUCH_DRAG_THRESHOLD : MOUSE_DRAG_THRESHOLD;
+  dragThresholdSq = threshold * threshold;
+
+  if (e.button === 1 || (e.button === 0 && e.shiftKey)) dragMode = 'pan';
+  else if (e.button === 0) dragMode = 'orbit';
+  else dragMode = 'none';
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (downButton === -1) return;
+
+  if (!dragged) {
+    const dx = e.clientX - downX;
+    const dy = e.clientY - downY;
+    if (dx * dx + dy * dy > dragThresholdSq) dragged = true;
   }
 
-  setSelected(selectedCell === hoveredCell ? null : hoveredCell);
+  if (dragged && dragMode !== 'none') {
+    const ddx = e.clientX - lastX;
+    const ddy = e.clientY - lastY;
+    if (dragMode === 'orbit') cameraController.orbit(ddx, ddy);
+    else cameraController.pan(ddx, ddy);
+  }
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  canvas.releasePointerCapture(e.pointerId);
+
+  if (downButton === 0 && !dragged && hoveredCell !== null && hoveredCell === downCell) {
+    if (downShift) board.toggleBlocker(hoveredCell);
+    else setSelected(selectedCell === hoveredCell ? null : hoveredCell);
+  }
+
+  downButton = -1;
+  dragMode = 'none';
 });
 
 const NAV_DELTA: Record<string, [number, number, number]> = {

@@ -30,10 +30,6 @@ export class CameraController {
   private curRadius = this.radius;
   private curTarget = this.target.clone();
 
-  private dragging: 'none' | 'orbit' | 'pan' = 'none';
-  private lastX = 0;
-  private lastY = 0;
-
   private readonly defaultPreset: Preset;
 
   constructor(domElement: HTMLElement) {
@@ -54,43 +50,23 @@ export class CameraController {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Apply an orbit-drag delta (screen pixels). Caller decides when a drag has actually started. */
+  orbit(dx: number, dy: number): void {
+    this.theta -= dx * 0.006;
+    this.phi = THREE.MathUtils.clamp(this.phi - dy * 0.006, EPS, Math.PI - EPS);
+  }
+
+  /** Apply a pan-drag delta (screen pixels). */
+  pan(dx: number, dy: number): void {
+    const panScale = this.radius * 0.0012;
+    const right = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 2, this.theta + Math.PI / 2);
+    const up = new THREE.Vector3(0, 1, 0);
+    this.target.addScaledVector(right, -dx * panScale);
+    this.target.addScaledVector(up, dy * panScale);
+  }
+
   private bind(el: HTMLElement): void {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    el.addEventListener('pointerdown', (e) => {
-      el.setPointerCapture(e.pointerId);
-      this.lastX = e.clientX;
-      this.lastY = e.clientY;
-      if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-        this.dragging = 'pan';
-      } else if (e.button === 0) {
-        this.dragging = 'orbit';
-      }
-    });
-
-    el.addEventListener('pointerup', (e) => {
-      el.releasePointerCapture(e.pointerId);
-      this.dragging = 'none';
-    });
-
-    el.addEventListener('pointermove', (e) => {
-      if (this.dragging === 'none') return;
-      const dx = e.clientX - this.lastX;
-      const dy = e.clientY - this.lastY;
-      this.lastX = e.clientX;
-      this.lastY = e.clientY;
-
-      if (this.dragging === 'orbit') {
-        this.theta -= dx * 0.006;
-        this.phi = THREE.MathUtils.clamp(this.phi - dy * 0.006, EPS, Math.PI - EPS);
-      } else if (this.dragging === 'pan') {
-        const panScale = this.radius * 0.0012;
-        const right = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 2, this.theta + Math.PI / 2);
-        const up = new THREE.Vector3(0, 1, 0);
-        this.target.addScaledVector(right, -dx * panScale);
-        this.target.addScaledVector(up, dy * panScale);
-      }
-    });
 
     el.addEventListener(
       'wheel',
