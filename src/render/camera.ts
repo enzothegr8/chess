@@ -78,8 +78,8 @@ export class CameraController {
     );
 
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Digit1') this.snapWhite();
-      if (e.code === 'Digit2') this.snapBlack();
+      if (e.code === 'Digit1') this.snapBlue();
+      if (e.code === 'Digit2') this.snapRed();
       if (e.code === 'Digit3') this.snapTop();
       if (e.code === 'KeyR') this.reset();
     });
@@ -92,11 +92,13 @@ export class CameraController {
     this.target.copy(this.defaultPreset.target);
   }
 
-  snapWhite(): void {
+  /** Blue holds z = 0, the reference frame for all coordinates. */
+  snapBlue(): void {
     this.snap(0, THREE.MathUtils.degToRad(58));
   }
 
-  snapBlack(): void {
+  /** Red holds z = N-1. */
+  snapRed(): void {
     this.snap(Math.PI, THREE.MathUtils.degToRad(58));
   }
 

@@ -32,7 +32,7 @@ function buildBoundingCube(): THREE.Group {
 
   const boxGeo = new THREE.BoxGeometry(N * CELL, N * CELL, N * CELL);
   const edges = new THREE.EdgesGeometry(boxGeo);
-  const wireMat = new THREE.LineBasicMaterial({ color: '#38e1ff', transparent: true, opacity: 0.35 });
+  const wireMat = new THREE.LineBasicMaterial({ color: '#7e8ca0', transparent: true, opacity: 0.35 });
   group.add(new THREE.LineSegments(edges, wireMat));
 
   // corner brackets: targeting-reticle overshoot at each of the 8 corners
@@ -61,13 +61,19 @@ function buildBoundingCube(): THREE.Group {
 
   const bracketGeo = new THREE.BufferGeometry();
   bracketGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  const bracketMat = new THREE.LineBasicMaterial({ color: '#38e1ff', transparent: true, opacity: 0.95 });
+  const bracketMat = new THREE.LineBasicMaterial({ color: '#7e8ca0', transparent: true, opacity: 0.95 });
   group.add(new THREE.LineSegments(bracketGeo, bracketMat));
 
   return group;
 }
 
-function buildAxisRuler(axis: 'x' | 'y' | 'z', color: string): THREE.Group {
+const RULER_COLOR = '#c3ccd9';
+
+// All three axis rulers share one neutral color — cyan now means the Blue
+// faction and amber now means threat, so the rulers can no longer use
+// either. Each is still identifiable by its x/y/z end glyph.
+function buildAxisRuler(axis: 'x' | 'y' | 'z'): THREE.Group {
+  const color = RULER_COLOR;
   const group = new THREE.Group();
   const points: THREE.Vector3[] = [];
 
@@ -103,9 +109,9 @@ export function buildLattice(): THREE.Group {
   const group = new THREE.Group();
 
   group.add(buildBoundingCube());
-  group.add(buildAxisRuler('x', '#38e1ff'));
-  group.add(buildAxisRuler('y', '#eafeff'));
-  group.add(buildAxisRuler('z', '#ffb13d'));
+  group.add(buildAxisRuler('x'));
+  group.add(buildAxisRuler('y'));
+  group.add(buildAxisRuler('z'));
 
   return group;
 }

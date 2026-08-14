@@ -1,12 +1,15 @@
 :root {
   --void: #04060f;
   --nebula: #0c1330;
+  --grid: #7e8ca0;
   --lattice: #a8b0bc;
-  --holo: #38e1ff;
-  --holo-core: #eafeff;
-  --ember: #ffb13d;
-  --ember-core: #fff0d2;
-  --alarm: #ff3b6b;
+  --ruler: #c3ccd9;
+  --focus: #eafeff;
+  --blue: #38e1ff;
+  --blue-core: #eafeff;
+  --red: #ff4d5e;
+  --red-core: #ffe3e6;
+  --alert: #ffb13d;
   --font-display: 'Chakra Petch', sans-serif;
   --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
@@ -25,7 +28,7 @@ body {
   background: var(--void);
   overflow: hidden;
   font-family: var(--font-body);
-  color: var(--holo-core);
+  color: var(--focus);
 }
 
 #app {
@@ -50,7 +53,7 @@ canvas.viewport {
 .hud-panel {
   position: absolute;
   background: rgba(4, 6, 15, 0.72);
-  border: 1px solid rgba(56, 225, 255, 0.35);
+  border: 1px solid rgba(126, 140, 160, 0.35);
   border-radius: 4px;
   padding: 10px 14px;
   backdrop-filter: blur(6px);
@@ -72,7 +75,7 @@ canvas.viewport {
 }
 
 .status-label {
-  color: var(--holo);
+  color: var(--ruler);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 10px;
@@ -81,7 +84,7 @@ canvas.viewport {
 }
 
 .status-val {
-  color: var(--holo-core);
+  color: var(--focus);
   font-size: 14px;
 }
 
@@ -107,8 +110,8 @@ canvas.viewport {
 #camera-presets button {
   pointer-events: auto;
   background: rgba(27, 53, 86, 0.6);
-  border: 1px solid var(--holo);
-  color: var(--holo-core);
+  border: 1px solid var(--ruler);
+  color: var(--focus);
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 6px 10px;
@@ -118,8 +121,8 @@ canvas.viewport {
 }
 
 #camera-presets button:hover {
-  background: rgba(56, 225, 255, 0.25);
-  box-shadow: 0 0 8px rgba(56, 225, 255, 0.5);
+  background: rgba(234, 254, 255, 0.18);
+  box-shadow: 0 0 8px rgba(234, 254, 255, 0.4);
 }
 
 #controls-hint {
@@ -132,5 +135,5 @@ canvas.viewport {
 }
 
 #controls-hint b {
-  color: var(--holo);
+  color: var(--ruler);
 }

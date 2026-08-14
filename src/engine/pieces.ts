@@ -1,11 +1,13 @@
 import { ORTHOGONAL } from './vectors';
 import { N } from './config';
 import type { PieceDef } from './movement';
+import { SIDE } from './types';
 
 export const ROOK: PieceDef = {
   id: 'rook',
   name: 'Rook',
   glyph: 'R',
+  side: SIDE.Blue,
   components: [
     {
       vectors: ORTHOGONAL,

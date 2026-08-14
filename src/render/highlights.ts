@@ -6,7 +6,9 @@ import { toWorld } from '../engine/coords';
 // (world-forward is -z), so the "origin corner wall" — where the axis
 // rulers read 0 — sits on opposite sides for z versus x/y.
 const ORIGIN_SIGN: Record<'x' | 'y' | 'z', 1 | -1> = { x: -1, y: -1, z: 1 };
-const AXIS_COLOR: Record<'x' | 'y' | 'z', string> = { x: '#38e1ff', y: '#eafeff', z: '#ffb13d' };
+// Guide lines are --focus on all three axes — cyan means the Blue faction
+// and amber means threat now, so neither can be reused here.
+const GUIDE_COLOR = '#eafeff';
 
 interface AxisVisual {
   bright: THREE.Line;
@@ -25,8 +27,8 @@ export class GuideLines {
   private readonly axes: Record<'x' | 'y' | 'z', AxisVisual>;
 
   constructor() {
-    const make = (axis: 'x' | 'y' | 'z'): AxisVisual => {
-      const color = AXIS_COLOR[axis];
+    const make = (): AxisVisual => {
+      const color = GUIDE_COLOR;
       const brightMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false });
       const dimMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.16, depthTest: false, depthWrite: false });
       const dotGeo = new THREE.SphereGeometry(CELL * 0.045, 8, 8);
@@ -46,7 +48,7 @@ export class GuideLines {
       return { bright, dim, originDot, farDot };
     };
 
-    this.axes = { x: make('x'), y: make('y'), z: make('z') };
+    this.axes = { x: make(), y: make(), z: make() };
     this.group.visible = false;
   }
 

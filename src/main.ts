@@ -32,8 +32,8 @@ let depthInfo = { depth: 0, hitCount: 0 };
 
 const hud = new Hud(app, {
   onPreset: (preset) => {
-    if (preset === '1') cameraController.snapWhite();
-    if (preset === '2') cameraController.snapBlack();
+    if (preset === '1') cameraController.snapBlue();
+    if (preset === '2') cameraController.snapRed();
     if (preset === '3') cameraController.snapTop();
     if (preset === 'r') cameraController.reset();
   },
@@ -41,6 +41,7 @@ const hud = new Hud(app, {
 
 const board = new PieceBoard({
   onChange: () => {
+    nodeField.setPieceSide(board.getPieceSide());
     nodeField.setBoardState(board.reachable, board.capturable, board.getPieceCell());
     updateHud();
   },

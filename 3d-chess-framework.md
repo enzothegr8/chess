@@ -38,19 +38,20 @@ If the result is its own standalone game rather than "chess but 3D," that is a f
 |---|---|---|
 | L1 | **Win condition is checkmate.** | Everything else bends around this. |
 | L2 | **Local hot seat and vs AI are both required.** | AI is a first-class goal, not a stretch goal. This has real architectural consequences (section 5). |
-| L3 | **Coordinate system:** true (x, y, z), always from White's perspective. | See 2.1. |
+| L3 | **Coordinate system:** true (x, y, z), always from Blue's perspective. | See 2.1. |
 | L4 | **Free camera:** orbit, zoom, pan, dolly, vertical travel. | |
 | L5 | **Pieces render as glowing nodes carrying a billboarded icon glyph.** | Identity never depends on viewing angle. |
 | L6 | **Holographic / deep space visual identity.** | Palette and type in section 6. |
 | L7 | **Lattice size N is a configuration constant, not a design commitment.** | See 4.4. The renderer, engine, and coordinate system are all written parameterized by N so that changing 8 to 6 to 5 is a one-line change. |
+| L8 | **The two sides are Blue and Red**, everywhere: source code, UI, notation, and documentation. The words White and Black do not appear. | Blue occupies `z = 0`, is the reference frame for all coordinates, and moves first. |
 
 ### 2.1 Coordinate system
 
-- Axes are **x** (left to right), **y** (down to up), **z** (near to far), all from White's default view with White's home side nearest the camera.
+- Axes are **x** (left to right), **y** (down to up), **z** (near to far), all from Blue's default view with Blue's home side nearest the camera.
 - **Zero-based, mathematically true origin.** Every axis runs `0` to `N-1`.
-- The **origin cell is White's bottom-left-near corner**: `(0, 0, 0)`.
-- x increases to the right, y increases upward, z increases away from White toward Black.
-- White's home plane is `z = 0`. Black's home plane is `z = N-1`.
+- The **origin cell is Blue's bottom-left-near corner**: `(0, 0, 0)`.
+- x increases to the right, y increases upward, z increases away from Blue toward Red.
+- Blue's home plane is `z = 0`. Red's home plane is `z = N-1`.
 - The position is mirrored across the z midplane only, so both kings sit on the same x and y.
 
 Cells display as three numbers, `(4, 5, 0)`, with a compact form `450` for the move log and HUD.
@@ -297,14 +298,21 @@ Reads as **an instrument, not a toy**: something two people are reading data off
 |---|---|---|
 | `--void` | `#04060F` | background base, near-black with a blue bias |
 | `--nebula` | `#0C1330` | slow-drifting background gradient |
-| `--lattice` | `#1B3556` | inactive cell markers, dormant grid |
-| `--holo` | `#38E1FF` | active grid, rulers, White faction |
-| `--holo-core` | `#EAFEFF` | White node cores |
-| `--ember` | `#FFB13D` | Black faction |
-| `--ember-core` | `#FFF0D2` | Black node cores |
-| `--alarm` | `#FF3B6B` | capture markers, check state |
+| `--grid` | `#7E8CA0` | bounding cube, neutral chrome |
+| `--lattice` | `#A8B0BC` | idle node bodies, opacity ramped by depth |
+| `--ruler` | `#C3CCD9` | axis rulers and tick labels, all three axes |
+| `--focus` | `#EAFEFF` | hovered and selected nodes, guide lines |
+| `--blue` | `#38E1FF` | **Blue faction** |
+| `--blue-core` | `#EAFEFF` | Blue node cores |
+| `--red` | `#FF4D5E` | **Red faction** |
+| `--red-core` | `#FFE3E6` | Red node cores |
+| `--alert` | `#FFB13D` | capture markers, check state |
 
-Cyan versus amber rather than the usual cyan versus magenta: more readable at low opacity against a blue-black field, and it survives the common forms of color blindness. Faction is also differentiated by **shape**, not only color (White nodes solid, Black nodes open wireframe cages), which is what actually guarantees readability under heavy occlusion.
+**Saturation carries meaning.** The only saturated colors anywhere in the scene are the two factions and the amber alert. The cube, the rulers, the idle nodes, and every piece of chrome are neutral gray. This is what makes the position readable at a glance: if it has color, it is a piece or a threat.
+
+This forced two changes when the factions were renamed. The alert color moved from rose to amber, because a red alert marker is indistinguishable from a Red piece. And the axis rulers dropped their per-axis coloring (formerly x cyan, y white, z amber), because cyan and amber now mean Blue and threat. The rulers are differentiated by the large `x` / `y` / `z` glyph at the far end of each, which was always doing most of the work anyway.
+
+Blue versus red survives the common forms of color blindness, unlike red versus green. Faction is also differentiated by **shape**, not only color (Blue nodes solid, Red nodes open wireframe cages), which is what actually guarantees readability under heavy occlusion.
 
 ### 7.2 Type
 
@@ -322,7 +330,7 @@ There is no board. There is a projection volume.
 
 - Bright **wireframe bounding cube** with overshooting corner brackets, like a targeting reticle.
 - Faint **cell-center dots**, not a full wireframe. A full N^3 wireframe is unreadable noise.
-- **Axis rulers** along the three edges meeting at the origin corner `(0,0,0)`: x in cyan, y in white, z in amber, billboarded and always legible. Ticks labeled `0` to `N-1`.
+- **Axis rulers** along the three edges meeting at the origin corner `(0,0,0)`, all three in neutral `--ruler`, billboarded and always legible. Ticks labeled `0` to `N-1`, with a large `x` / `y` / `z` glyph at the far end of each.
 - **Guide planes** through the hovered cell so position in all three axes reads at a glance.
 
 ### 7.4 Signature element
@@ -384,5 +392,6 @@ Parked, not proposed. Nothing here is a recommendation.
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-08-14 | Initial draft: full piece set, four army layouts, rule analysis |
+| 0.4 | 2026-08-14 | Factions renamed from White/Black to **Blue/Red** everywhere, internal and external (L8). Blue holds `z = 0` and moves first. Palette reworked: alert color moved rose to amber, axis rulers made neutral, saturation reserved for factions and threats. |
 | 0.3 | 2026-08-14 | Coordinate system locked to zero-based with true origin at `(0,0,0)`. Display and engine coordinates unified (no conversion layer). Added index and world-space formulas. Q1 resolved. Phase 1 / 1.5 build brief issued as a companion document. |
 | 0.2 | 2026-08-14 | Restructured around Locked / Open / Deferred. Piece definitions and army layouts unlocked and moved to appendix. Added escape-count and branching-factor analysis. Added phase 1.5 piece laboratory. Coordinate origin locked to White's bottom-left-near corner. AI confirmed as a locked goal. |

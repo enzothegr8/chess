@@ -31,8 +31,8 @@ export class Hud {
       b.addEventListener('click', handler);
       presets.appendChild(b);
     };
-    btn('White [1]', () => callbacks.onPreset('1'));
-    btn('Black [2]', () => callbacks.onPreset('2'));
+    btn('Blue [1]', () => callbacks.onPreset('1'));
+    btn('Red [2]', () => callbacks.onPreset('2'));
     btn('Top [3]', () => callbacks.onPreset('3'));
     btn('Reset [R]', () => callbacks.onPreset('r'));
 

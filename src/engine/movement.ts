@@ -1,6 +1,7 @@
 import { N } from './config';
 import { inBounds, toIndex } from './coords';
 import type { Vec3 } from './vectors';
+import type { Side } from './types';
 
 export interface MovementComponent {
   vectors: readonly Vec3[];
@@ -16,6 +17,7 @@ export interface PieceDef {
   id: string;
   name: string;
   glyph: string;
+  side: Side;
   components: MovementComponent[];
 }
 

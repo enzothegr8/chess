@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { N, CELL, CELLS } from '../engine/config';
+import { SIDE, type Side } from '../engine/types';
 
 const IDLE = 0;
 const REACHABLE = 1;
@@ -8,13 +9,20 @@ const HOVERED = 3;
 const SELECTED = 4;
 const OCCUPIED = 5;
 
+const BLUE = '#38e1ff';
+const BLUE_CORE = '#eafeff';
+const RED = '#ff4d5e';
+const RED_CORE = '#ffe3e6';
+
+// Reachable and occupied are the two states whose color depends on which
+// side owns the selected piece — everything else is fixed.
 const STATE_COLOR = [
   new THREE.Color('#a8b0bc'), // idle          --lattice
-  new THREE.Color('#38e1ff'), // reachable     --holo
-  new THREE.Color('#ff3b6b'), // capturable    --alarm
-  new THREE.Color('#eafeff'), // hovered       --holo-core
-  new THREE.Color('#eafeff'), // selected      --holo-core
-  new THREE.Color('#eafeff'), // occupied      --holo-core
+  new THREE.Color(BLUE), // reachable     --blue or --red, set via setPieceSide
+  new THREE.Color('#ffb13d'), // capturable    --alert
+  new THREE.Color('#eafeff'), // hovered       --focus
+  new THREE.Color('#eafeff'), // selected      --focus
+  new THREE.Color(BLUE_CORE), // occupied      --blue-core or --red-core
 ];
 const STATE_SCALE = [1.0, 1.4, 1.4, 1.5, 1.8, 2.0];
 
@@ -35,6 +43,7 @@ export class NodeField {
   readonly group = new THREE.Group();
   private readonly mesh: THREE.InstancedMesh;
   private readonly occupiedRing: THREE.Mesh;
+  private readonly ringMaterial: THREE.MeshBasicMaterial;
 
   private readonly boardState = new Uint8Array(CELLS); // reachable/capturable/occupied/idle only
   private readonly cellState = new Uint8Array(CELLS); // boardState + hover/selection overlays
@@ -60,17 +69,26 @@ export class NodeField {
 
     const ringGeo = new THREE.RingGeometry(CELL * 0.24, CELL * 0.3, 24);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: '#eafeff',
+      color: BLUE_CORE,
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide,
       depthTest: false,
       depthWrite: false,
     });
+    this.ringMaterial = ringMat;
     this.occupiedRing = new THREE.Mesh(ringGeo, ringMat);
     this.occupiedRing.renderOrder = 6;
     this.occupiedRing.visible = false;
     this.group.add(this.occupiedRing);
+  }
+
+  /** The reachable-ray and occupied-core colors follow whichever side owns the selected piece. */
+  setPieceSide(side: Side): void {
+    const [rayColor, coreColor] = side === SIDE.Red ? [RED, RED_CORE] : [BLUE, BLUE_CORE];
+    STATE_COLOR[REACHABLE].set(rayColor);
+    STATE_COLOR[OCCUPIED].set(coreColor);
+    this.ringMaterial.color.set(coreColor);
   }
 
   /** Board-derived state: called whenever the piece moves or a blocker is toggled. */

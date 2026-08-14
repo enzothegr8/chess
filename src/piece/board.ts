@@ -4,6 +4,9 @@ import { inBounds, toIndex, toWorld, tuple } from '../engine/coords';
 import { generateMoves, EMPTY, FRIENDLY, type PieceDef } from '../engine/movement';
 import { makeBeam } from '../render/highlights';
 import { ROOK } from '../engine/pieces';
+import { SIDE, type Side } from '../engine/types';
+
+const RAY_COLOR: Record<Side, string> = { [SIDE.Blue]: '#38e1ff', [SIDE.Red]: '#ff4d5e' };
 
 export interface PieceHudState {
   name: string;
@@ -37,6 +40,10 @@ export class PieceBoard {
 
   getPieceCell(): number | null {
     return this.pieceCell;
+  }
+
+  getPieceSide(): Side {
+    return this.def.side;
   }
 
   /** Place the piece if unplaced, or move it if `index` is a legal (reachable) destination. */
@@ -131,7 +138,8 @@ export class PieceBoard {
 
         if (lastReachable) {
           const w = toWorld(lastReachable[0], lastReachable[1], lastReachable[2]);
-          this.visuals.add(makeBeam(from.clone(), new THREE.Vector3(w.x, w.y, w.z), '#38e1ff'));
+          const color = RAY_COLOR[this.def.side];
+          this.visuals.add(makeBeam(from.clone(), new THREE.Vector3(w.x, w.y, w.z), color));
         }
       }
     }
