@@ -1,11 +1,6 @@
 import * as THREE from 'three';
-import { N, CELL, CELLS } from '../engine/config';
+import { N, CELL } from '../engine/config';
 import { toWorld } from '../engine/coords';
-
-export interface LatticeBundle {
-  group: THREE.Group;
-  cellMarkers: THREE.InstancedMesh;
-}
 
 function makeTextSprite(text: string, color: string, sizePx = 48): THREE.Sprite {
   const canvas = document.createElement('canvas');
@@ -72,25 +67,6 @@ function buildBoundingCube(): THREE.Group {
   return group;
 }
 
-function buildCellMarkers(): THREE.InstancedMesh {
-  const geometry = new THREE.OctahedronGeometry(CELL * 0.05, 0);
-  const material = new THREE.MeshBasicMaterial({ color: '#1b3556' });
-  const mesh = new THREE.InstancedMesh(geometry, material, CELLS);
-
-  const dummy = new THREE.Object3D();
-  for (let i = 0; i < CELLS; i++) {
-    const x = i % N;
-    const y = Math.floor(i / N) % N;
-    const z = Math.floor(i / (N * N));
-    const w = toWorld(x, y, z);
-    dummy.position.set(w.x, w.y, w.z);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  return mesh;
-}
-
 function buildAxisRuler(axis: 'x' | 'y' | 'z', color: string): THREE.Group {
   const group = new THREE.Group();
   const points: THREE.Vector3[] = [];
@@ -123,7 +99,7 @@ function buildAxisRuler(axis: 'x' | 'y' | 'z', color: string): THREE.Group {
   return group;
 }
 
-export function buildLattice(): LatticeBundle {
+export function buildLattice(): THREE.Group {
   const group = new THREE.Group();
 
   group.add(buildBoundingCube());
@@ -131,8 +107,5 @@ export function buildLattice(): LatticeBundle {
   group.add(buildAxisRuler('y', '#eafeff'));
   group.add(buildAxisRuler('z', '#ffb13d'));
 
-  const cellMarkers = buildCellMarkers();
-  group.add(cellMarkers);
-
-  return { group, cellMarkers };
+  return group;
 }

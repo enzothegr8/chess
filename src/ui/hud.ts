@@ -8,8 +8,7 @@ export interface HudCallbacks {
 
 export class Hud {
   private readonly root: HTMLElement;
-  private readonly hoverReadout: HTMLElement;
-  private readonly pieceReadout: HTMLElement;
+  private readonly statusReadout: HTMLElement;
   private readonly fpsEl: HTMLElement;
   private frames = 0;
   private lastFpsUpdate = performance.now();
@@ -19,11 +18,8 @@ export class Hud {
     this.root.className = 'hud';
     container.appendChild(this.root);
 
-    this.hoverReadout = this.panel('hover-readout');
-    this.hoverReadout.innerHTML = this.hoverHtml(null, 0, 0);
-
-    this.pieceReadout = this.panel('piece-readout');
-    this.pieceReadout.innerHTML = this.pieceHtml(null);
+    this.statusReadout = this.panel('status-readout');
+    this.setStatus(null, 0, 0, null);
 
     this.fpsEl = this.panel('fps');
     this.fpsEl.textContent = '-- fps';
@@ -42,9 +38,9 @@ export class Hud {
 
     const hint = this.panel('controls-hint');
     hint.innerHTML =
-      '<b>Orbit</b> drag &middot; <b>Zoom</b> scroll &middot; <b>Pan</b> shift+drag<br>' +
-      '<b>Fly</b> WASD QE &middot; <b>Views</b> 1 2 3 &middot; <b>Reset</b> R<br>' +
-      '<b>Place/move</b> click &middot; <b>Blocker</b> shift+click &middot; <b>Clear</b> backspace';
+      '<b>Orbit</b> drag &middot; <b>Zoom</b> scroll &middot; <b>Pan</b> shift+drag &middot; <b>Views</b> 1 2 3 &middot; <b>Reset</b> R<br>' +
+      '<b>Cursor</b> W A S D, &uarr; &darr; &middot; <b>Place/move</b> enter/space<br>' +
+      '<b>Blocker</b> shift+click &middot; <b>Clear</b> backspace';
   }
 
   private panel(id: string): HTMLElement {
@@ -55,36 +51,31 @@ export class Hud {
     return el;
   }
 
-  private hoverHtml(index: number | null, depth: number, hitCount: number): string {
-    if (index === null) {
-      return '<div class="title">Hover</div><div class="coord">--</div>';
+  setStatus(cellIndex: number | null, depth: number, hitCount: number, piece: PieceHudState | null): void {
+    let html = '<div class="status-row"><span class="status-label">cell</span>';
+    if (cellIndex === null) {
+      html += '<span class="status-val">--</span></div>';
+    } else {
+      const x = cellIndex % N;
+      const y = Math.floor(cellIndex / N) % N;
+      const z = Math.floor(cellIndex / (N * N));
+      html += `<span class="status-val">(${x}, ${y}, ${z})  ${label(cellIndex)}</span>`;
+      if (hitCount > 1) html += `<span class="status-sub">${depth + 1} / ${hitCount}</span>`;
+      html += '</div>';
     }
-    const x = index % N;
-    const y = Math.floor(index / N) % N;
-    const z = Math.floor(index / (N * N));
-    let html =
-      '<div class="title">Hover</div>' +
-      `<div class="coord">(${x}, ${y}, ${z})  &middot;  ${label(index)}</div>`;
-    if (hitCount > 1) html += `<div>${depth + 1} / ${hitCount}</div>`;
-    return html;
-  }
 
-  private pieceHtml(state: PieceHudState | null): string {
-    if (!state) return '<div class="title">Piece</div><div class="coord">--</div>';
-    const [x, y, z] = state.cell;
-    return (
-      '<div class="title">Piece</div>' +
-      `<div class="coord">${state.name}  (${x}, ${y}, ${z})</div>` +
-      `<div>reach  ${state.reachable} cells</div>`
-    );
-  }
+    if (piece) {
+      const [px, py, pz] = piece.cell;
+      html +=
+        '<div class="status-row"><span class="status-label">piece</span>' +
+        `<span class="status-val">${piece.name}  (${px}, ${py}, ${pz})</span></div>` +
+        '<div class="status-row"><span class="status-label">reach</span>' +
+        `<span class="status-val">${piece.reachable} cells</span></div>`;
+    } else {
+      html += '<div class="status-row"><span class="status-label">piece</span><span class="status-val">--</span></div>';
+    }
 
-  setHover(index: number | null, depth: number, hitCount: number): void {
-    this.hoverReadout.innerHTML = this.hoverHtml(index, depth, hitCount);
-  }
-
-  setPiece(state: PieceHudState | null): void {
-    this.pieceReadout.innerHTML = this.pieceHtml(state);
+    this.statusReadout.innerHTML = html;
   }
 
   tickFps(): void {

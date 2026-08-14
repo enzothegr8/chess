@@ -2,45 +2,6 @@ import * as THREE from 'three';
 import { N, CELL } from '../engine/config';
 import { toWorld } from '../engine/coords';
 
-const HOVER_COLOR = new THREE.Color('#eafeff'); // --holo-core
-const BASE_COLOR = new THREE.Color('#1b3556');
-
-/** Manages the single hovered-node marker: scale-up + full-brightness recolor. */
-export class HoverHighlight {
-  private mesh: THREE.InstancedMesh;
-  private current: number | null = null;
-  private readonly baseMatrix = new THREE.Matrix4();
-  private readonly dummy = new THREE.Object3D();
-
-  constructor(mesh: THREE.InstancedMesh) {
-    this.mesh = mesh;
-    for (let i = 0; i < mesh.count; i++) mesh.setColorAt(i, BASE_COLOR);
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }
-
-  setHover(index: number | null): void {
-    if (index === this.current) return;
-
-    if (this.current !== null) {
-      this.mesh.setMatrixAt(this.current, this.baseMatrix);
-      this.mesh.setColorAt(this.current, BASE_COLOR);
-    }
-
-    if (index !== null) {
-      this.mesh.getMatrixAt(index, this.baseMatrix);
-      this.dummy.position.setFromMatrixPosition(this.baseMatrix);
-      this.dummy.scale.setScalar(1.8);
-      this.dummy.updateMatrix();
-      this.mesh.setMatrixAt(index, this.dummy.matrix);
-      this.mesh.setColorAt(index, HOVER_COLOR);
-    }
-
-    this.current = index;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
-  }
-}
-
 // grid coordinate 0 maps to negative world-space on x/y but positive on z
 // (world-forward is -z), so the "origin corner wall" — where the axis
 // rulers read 0 — sits on opposite sides for z versus x/y.
@@ -118,21 +79,6 @@ export class GuideLines {
   hide(): void {
     this.group.visible = false;
   }
-}
-
-/** Hollow ring marker used to flag reachable cells and ray-blocked captures. */
-export function makeMarker(color: string): THREE.Mesh {
-  const geo = new THREE.RingGeometry(CELL * 0.14, CELL * 0.2, 16);
-  const mat = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.9,
-    side: THREE.DoubleSide,
-    depthTest: false,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.renderOrder = 5;
-  return mesh;
 }
 
 /** Translucent beam from `from` to `to`, for sliding movement components. Fades with distance. */

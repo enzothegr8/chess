@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELLS, N } from '../engine/config';
-import { toWorld, xOf, yOf, zOf } from '../engine/coords';
+import { toWorld } from '../engine/coords';
 
 export interface HoverState {
   index: number | null;
@@ -8,58 +8,45 @@ export interface HoverState {
   hitCount: number;
 }
 
-function buildCellCenters(): Float32Array {
-  const positions = new Float32Array(CELLS * 3);
-  for (let i = 0; i < CELLS; i++) {
-    const w = toWorld(xOf(i), yOf(i), zOf(i));
-    positions[i * 3] = w.x;
-    positions[i * 3 + 1] = w.y;
-    positions[i * 3 + 2] = w.z;
-  }
-  return positions;
-}
-
 const MIN_RADIUS = 6;
 const MAX_RADIUS = 40;
 const RADIUS_FACTOR = 0.45;
 
+function isTextInputFocused(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+}
+
 /**
  * Screen-space node picking: the lattice is a set of points, so we pick
  * against the points directly rather than raycasting against collider
- * volumes. Every cell center is projected to screen space each frame and
- * the nearest one under the cursor, within an adaptive pixel radius, wins.
+ * volumes. Recomputation happens on pointermove (event-driven, not polled
+ * every frame) so it never fights keyboard-driven active-cell changes —
+ * the moment the mouse actually moves, hover takes over again; until then,
+ * whatever last set the active cell stays in effect.
  */
 export class Picker {
-  private readonly positions = buildCellCenters();
   private readonly v = new THREE.Vector3();
 
-  // preallocated candidate scratch buffers — no per-frame array allocation
+  // preallocated candidate scratch buffers — no per-call array allocation
   private readonly candIdx = new Int32Array(CELLS);
   private readonly candDistSq = new Float32Array(CELLS);
   private candCount = 0;
-
   private cycleIndex = 0;
-  private mouseX = 0;
-  private mouseY = 0;
-  private hasPointer = false;
 
   constructor(
-    private readonly domElement: HTMLElement,
-    private readonly camera: THREE.Camera
+    domElement: HTMLElement,
+    private readonly camera: THREE.Camera,
+    private readonly positions: Float32Array,
+    private readonly onChange: (state: HoverState) => void
   ) {
     domElement.addEventListener('pointermove', (e) => {
       const rect = domElement.getBoundingClientRect();
-      this.mouseX = e.clientX - rect.left;
-      this.mouseY = e.clientY - rect.top;
-      this.hasPointer = true;
-    });
-
-    domElement.addEventListener('pointerleave', () => {
-      this.hasPointer = false;
-      this.candCount = 0;
+      this.recompute(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
     });
 
     window.addEventListener('keydown', (e) => {
+      if (isTextInputFocused()) return;
       if (e.code === 'BracketRight') this.cycle(1);
       if (e.code === 'BracketLeft') this.cycle(-1);
     });
@@ -68,6 +55,12 @@ export class Picker {
   private cycle(delta: number): void {
     if (this.candCount === 0) return;
     this.cycleIndex = THREE.MathUtils.clamp(this.cycleIndex + delta, 0, this.candCount - 1);
+    this.emit();
+  }
+
+  private emit(): void {
+    const index = this.candCount > 0 ? this.candIdx[this.cycleIndex] : null;
+    this.onChange({ index, depth: this.cycleIndex, hitCount: this.candCount });
   }
 
   private project(x: number, y: number, z: number, width: number, height: number): [number, number, number] {
@@ -88,15 +81,7 @@ export class Picker {
     return THREE.MathUtils.clamp(pitchPx * RADIUS_FACTOR, MIN_RADIUS, MAX_RADIUS);
   }
 
-  /** Re-projects every cell center against the latest pointer position; call once per frame. */
-  update(): HoverState {
-    if (!this.hasPointer) {
-      this.candCount = 0;
-      return { index: null, depth: 0, hitCount: 0 };
-    }
-
-    const rect = this.domElement.getBoundingClientRect();
-    const { width, height } = rect;
+  private recompute(mouseX: number, mouseY: number, width: number, height: number): void {
     const radius = this.adaptiveRadius(width, height);
     const camPos = this.camera.position;
 
@@ -109,7 +94,7 @@ export class Picker {
       const [sx, sy, sz] = this.project(px, py, pz, width, height);
       if (sz < -1 || sz > 1) continue;
 
-      const d = Math.hypot(sx - this.mouseX, sy - this.mouseY);
+      const d = Math.hypot(sx - mouseX, sy - mouseY);
       if (d > radius) continue;
 
       const dx = px - camPos.x;
@@ -135,11 +120,8 @@ export class Picker {
       this.candDistSq[j + 1] = dist;
     }
 
-    if (count !== this.candCount) this.cycleIndex = 0;
     this.candCount = count;
-    this.cycleIndex = Math.min(this.cycleIndex, Math.max(count - 1, 0));
-
-    const index = count > 0 ? this.candIdx[this.cycleIndex] : null;
-    return { index, depth: this.cycleIndex, hitCount: count };
+    this.cycleIndex = 0;
+    this.emit();
   }
 }

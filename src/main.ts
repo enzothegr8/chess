@@ -1,28 +1,31 @@
 import { createScene } from './render/scene';
 import { CameraController } from './render/camera';
 import { buildLattice } from './render/lattice';
-import { HoverHighlight, GuideLines } from './render/highlights';
+import { GuideLines } from './render/highlights';
+import { NodeField } from './render/nodes';
+import { buildCellPositions } from './render/cellPositions';
 import { Picker } from './input/picking';
 import { Hud } from './ui/hud';
 import { PieceBoard } from './piece/board';
-import { xOf, yOf, zOf } from './engine/coords';
+import { N } from './engine/config';
+import { inBounds, toIndex, tuple, xOf, yOf, zOf } from './engine/coords';
 
 const app = document.getElementById('app')!;
 
 const { scene, renderer, canvas } = createScene(app);
 const cameraController = new CameraController(canvas);
 
-const lattice = buildLattice();
-scene.add(lattice.group);
+scene.add(buildLattice());
 
-const hover = new HoverHighlight(lattice.cellMarkers);
+const positions = buildCellPositions();
+const nodeField = new NodeField(positions);
+scene.add(nodeField.group);
+
 const guideLines = new GuideLines();
 scene.add(guideLines.group);
 
-const picker = new Picker(canvas, cameraController.camera);
-
-const board = new PieceBoard();
-scene.add(board.visuals);
+let activeCell: number | null = null;
+let depthInfo = { depth: 0, hitCount: 0 };
 
 const hud = new Hud(app, {
   onPreset: (preset) => {
@@ -32,42 +35,99 @@ const hud = new Hud(app, {
     if (preset === 'r') cameraController.reset();
   },
 });
-hud.setPiece(board.getHudState());
+
+const board = new PieceBoard({
+  onChange: () => {
+    nodeField.setBoardState(board.reachable, board.capturable, board.getPieceCell());
+    hud.setStatus(activeCell, depthInfo.depth, depthInfo.hitCount, board.getHudState());
+  },
+});
+scene.add(board.visuals);
+
+function setActiveCell(index: number | null): void {
+  activeCell = index;
+  nodeField.setActiveCell(index);
+  if (index !== null) guideLines.show(xOf(index), yOf(index), zOf(index));
+  else guideLines.hide();
+  hud.setStatus(activeCell, depthInfo.depth, depthInfo.hitCount, board.getHudState());
+}
+
+new Picker(canvas, cameraController.camera, positions, (state) => {
+  depthInfo = { depth: state.depth, hitCount: state.hitCount };
+  setActiveCell(state.index);
+});
+
+function isTextInputFocused(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+}
+
+function centerCellIndex(): number {
+  const c = Math.floor(N / 2);
+  return toIndex(c, c, c);
+}
 
 canvas.addEventListener('click', (e) => {
-  const state = picker.update();
-  if (state.index !== null) {
-    board.handleClick(state.index, e.shiftKey);
-    hud.setPiece(board.getHudState());
+  if (activeCell === null) return;
+
+  if (e.shiftKey) {
+    board.toggleBlocker(activeCell);
+  } else if (activeCell === board.getPieceCell()) {
+    board.removePiece();
+  } else {
+    board.activateCell(activeCell);
   }
 });
 
+const NAV_DELTA: Record<string, [number, number, number]> = {
+  KeyW: [0, 0, 1],
+  KeyS: [0, 0, -1],
+  KeyA: [-1, 0, 0],
+  KeyD: [1, 0, 0],
+  ArrowUp: [0, 1, 0],
+  ArrowDown: [0, -1, 0],
+};
+
 window.addEventListener('keydown', (e) => {
+  if (isTextInputFocused()) return;
+
   if (e.code === 'Backspace') {
     board.clear();
-    hud.setPiece(board.getHudState());
+    return;
+  }
+
+  if (e.code in NAV_DELTA) {
+    e.preventDefault();
+    if (activeCell === null) {
+      setActiveCell(centerCellIndex());
+      return;
+    }
+    const [dx, dy, dz] = NAV_DELTA[e.code];
+    const [bx, by, bz] = tuple(activeCell);
+    const nx = bx + dx;
+    const ny = by + dy;
+    const nz = bz + dz;
+    if (!inBounds(nx, ny, nz)) return; // clamp at the lattice bounds, no wrap
+    setActiveCell(toIndex(nx, ny, nz));
+    return;
+  }
+
+  if (e.code === 'Enter' || e.code === 'Space') {
+    e.preventDefault();
+    if (activeCell !== null) board.activateCell(activeCell);
   }
 });
 
 let last = performance.now();
-function frame(now: number): void {
+function loop(now: number): void {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
 
   cameraController.update(dt);
-
-  const hoverState = picker.update();
-  hover.setHover(hoverState.index);
-  hud.setHover(hoverState.index, hoverState.depth, hoverState.hitCount);
-  if (hoverState.index !== null) {
-    guideLines.show(xOf(hoverState.index), yOf(hoverState.index), zOf(hoverState.index));
-  } else {
-    guideLines.hide();
-  }
-
+  nodeField.update(cameraController.camera);
   hud.tickFps();
   renderer.render(scene, cameraController.camera);
-  requestAnimationFrame(frame);
+  requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(frame);
+requestAnimationFrame(loop);

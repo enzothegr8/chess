@@ -30,7 +30,6 @@ export class CameraController {
   private curRadius = this.radius;
   private curTarget = this.target.clone();
 
-  private keys = new Set<string>();
   private dragging: 'none' | 'orbit' | 'pan' = 'none';
   private lastX = 0;
   private lastY = 0;
@@ -103,13 +102,11 @@ export class CameraController {
     );
 
     window.addEventListener('keydown', (e) => {
-      this.keys.add(e.code);
       if (e.code === 'Digit1') this.snapWhite();
       if (e.code === 'Digit2') this.snapBlack();
       if (e.code === 'Digit3') this.snapTop();
       if (e.code === 'KeyR') this.reset();
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
   }
 
   private snap(theta: number, phi: number): void {
@@ -153,25 +150,6 @@ export class CameraController {
   }
 
   update(dt: number): void {
-    // fly mode: WASD/QE translate the orbit target through space
-    const flySpeed = N * CELL * 0.9;
-    const forward = new THREE.Vector3().setFromSphericalCoords(1, this.phi, this.theta).multiplyScalar(-1);
-    forward.y = 0;
-    if (forward.lengthSq() > 0) forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-    const move = new THREE.Vector3();
-    if (this.keys.has('KeyW')) move.add(forward);
-    if (this.keys.has('KeyS')) move.sub(forward);
-    if (this.keys.has('KeyD')) move.add(right);
-    if (this.keys.has('KeyA')) move.sub(right);
-    if (this.keys.has('KeyE')) move.y += 1;
-    if (this.keys.has('KeyQ')) move.y -= 1;
-    if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar(flySpeed * dt);
-      this.target.add(move);
-    }
-
     this.curTheta = damp(this.curTheta, this.theta, DAMP, dt);
     this.curPhi = damp(this.curPhi, this.phi, DAMP, dt);
     this.curRadius = damp(this.curRadius, this.radius, DAMP, dt);

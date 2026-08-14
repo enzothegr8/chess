@@ -1,7 +1,7 @@
 :root {
   --void: #04060f;
   --nebula: #0c1330;
-  --lattice: #1b3556;
+  --lattice: #5e82ae;
   --holo: #38e1ff;
   --holo-core: #eafeff;
   --ember: #ffb13d;
@@ -59,32 +59,35 @@ canvas.viewport {
   letter-spacing: 0.02em;
 }
 
-#hover-readout {
+#status-readout {
   top: 16px;
   left: 16px;
-  min-width: 200px;
+  min-width: 260px;
 }
 
-#piece-readout {
-  top: 108px;
-  left: 16px;
-  min-width: 200px;
+.status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
-#hover-readout .title,
-#piece-readout .title {
-  font-family: var(--font-display);
+.status-label {
   color: var(--holo);
-  font-size: 12px;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  width: 44px;
+  flex-shrink: 0;
 }
 
-#hover-readout .coord,
-#piece-readout .coord {
-  font-size: 16px;
+.status-val {
   color: var(--holo-core);
+  font-size: 14px;
+}
+
+.status-sub {
+  color: var(--lattice);
+  font-size: 11px;
 }
 
 #fps {

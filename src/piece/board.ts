@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CELLS, CELL } from '../engine/config';
 import { inBounds, toIndex, toWorld, tuple } from '../engine/coords';
 import { generateMoves, EMPTY, FRIENDLY, type PieceDef } from '../engine/movement';
-import { makeMarker, makeBeam } from '../render/highlights';
+import { makeBeam } from '../render/highlights';
 import { ROOK } from '../engine/pieces';
 
 export interface PieceHudState {
@@ -11,13 +11,20 @@ export interface PieceHudState {
   reachable: number;
 }
 
+export interface PieceBoardCallbacks {
+  onChange: () => void;
+}
+
 /**
- * Owns the single active piece, its blockers, and the always-on visualization
- * of its move set. No selection state beyond "is the piece placed" — the
- * full move set is shown whenever the piece is on the board.
+ * Owns the single active piece, its blockers, and the always-on move-set
+ * computation (reachable/capturable cells, which cell the piece occupies).
+ * Node coloring lives in render/nodes.ts — this class only decides state
+ * and draws the ray beams and blocker cubes.
  */
 export class PieceBoard {
   readonly visuals = new THREE.Group();
+  readonly reachable = new Set<number>();
+  readonly capturable = new Set<number>();
 
   private readonly def: PieceDef = ROOK;
   private pieceCell: number | null = null;
@@ -26,39 +33,52 @@ export class PieceBoard {
   private readonly occupancy = new Uint8Array(CELLS);
   private readonly moveBuf = new Int32Array(CELLS);
 
-  handleClick(index: number, shiftKey: boolean): void {
-    if (shiftKey) {
-      if (index === this.pieceCell) return;
-      if (this.blockers.has(index)) this.blockers.delete(index);
-      else this.blockers.add(index);
-      this.render();
+  constructor(private readonly callbacks: PieceBoardCallbacks) {}
+
+  getPieceCell(): number | null {
+    return this.pieceCell;
+  }
+
+  /** Place the piece if unplaced, or move it if `index` is a legal (reachable) destination. */
+  activateCell(index: number): void {
+    if (index === this.pieceCell) return;
+
+    if (this.pieceCell === null) {
+      this.blockers.delete(index);
+      this.pieceCell = index;
+      this.recompute();
       return;
     }
 
-    if (index === this.pieceCell) {
-      this.pieceCell = null; // click the piece: deselect (remove it)
-    } else {
+    if (this.reachable.has(index)) {
       this.blockers.delete(index);
-      this.pieceCell = index; // place, or move to a new cell
+      this.pieceCell = index;
+      this.recompute();
     }
-    this.render();
+  }
+
+  removePiece(): void {
+    if (this.pieceCell === null) return;
+    this.pieceCell = null;
+    this.recompute();
+  }
+
+  toggleBlocker(index: number): void {
+    if (index === this.pieceCell) return;
+    if (this.blockers.has(index)) this.blockers.delete(index);
+    else this.blockers.add(index);
+    this.recompute();
   }
 
   clear(): void {
     this.pieceCell = null;
     this.blockers.clear();
-    this.render();
+    this.recompute();
   }
 
   getHudState(): PieceHudState | null {
     if (this.pieceCell === null) return null;
-    return { name: this.def.name, cell: tuple(this.pieceCell), reachable: this.reachableCount() };
-  }
-
-  private reachableCount(): number {
-    if (this.pieceCell === null) return 0;
-    this.rebuildOccupancy();
-    return generateMoves(this.pieceCell, this.def, this.occupancy, this.moveBuf);
+    return { name: this.def.name, cell: tuple(this.pieceCell), reachable: this.reachable.size };
   }
 
   private rebuildOccupancy(): void {
@@ -66,18 +86,23 @@ export class PieceBoard {
     for (const b of this.blockers) this.occupancy[b] = FRIENDLY;
   }
 
-  private render(): void {
+  private recompute(): void {
     this.clearVisuals();
-    this.drawBlockers();
+    this.drawBlockerCubes();
+    this.reachable.clear();
+    this.capturable.clear();
 
-    if (this.pieceCell === null) return;
+    if (this.pieceCell === null) {
+      this.notify();
+      return;
+    }
 
     this.rebuildOccupancy();
     const moveCount = generateMoves(this.pieceCell, this.def, this.occupancy, this.moveBuf);
-    for (let i = 0; i < moveCount; i++) this.addMarker(this.moveBuf[i], '#38e1ff');
+    for (let i = 0; i < moveCount; i++) this.reachable.add(this.moveBuf[i]);
 
     this.drawRays();
-    this.addMarker(this.pieceCell, '#eafeff', 0.3);
+    this.notify();
   }
 
   private drawRays(): void {
@@ -91,7 +116,7 @@ export class PieceBoard {
       const effMax = comp.slide ? comp.maxRange : 1;
 
       for (const v of comp.vectors) {
-        let terminal: [number, number, number] | null = null;
+        let lastReachable: [number, number, number] | null = null;
         let blocked = false;
 
         for (let s = effMin; s <= effMax; s++) {
@@ -100,41 +125,34 @@ export class PieceBoard {
           const tz = fz + v[2] * s;
           if (!inBounds(tx, ty, tz) || blocked) break;
 
-          terminal = [tx, ty, tz];
-          const occ = this.occupancy[toIndex(tx, ty, tz)];
-          if (occ !== EMPTY && !comp.jumps) blocked = true;
+          const idx = toIndex(tx, ty, tz);
+          const occ = this.occupancy[idx];
+          if (occ === EMPTY) {
+            lastReachable = [tx, ty, tz];
+          } else if (!comp.jumps) {
+            this.capturable.add(idx);
+            blocked = true;
+          }
         }
 
-        if (!terminal) continue;
-
-        const w = toWorld(terminal[0], terminal[1], terminal[2]);
-        this.visuals.add(makeBeam(from.clone(), new THREE.Vector3(w.x, w.y, w.z), '#38e1ff'));
-
-        if (blocked) this.addMarker(toIndex(terminal[0], terminal[1], terminal[2]), '#ff3b6b');
+        if (lastReachable) {
+          const w = toWorld(lastReachable[0], lastReachable[1], lastReachable[2]);
+          this.visuals.add(makeBeam(from.clone(), new THREE.Vector3(w.x, w.y, w.z), '#38e1ff'));
+        }
       }
     }
   }
 
-  private drawBlockers(): void {
+  private drawBlockerCubes(): void {
     for (const b of this.blockers) {
       const [x, y, z] = tuple(b);
       const w = toWorld(x, y, z);
       const geo = new THREE.BoxGeometry(CELL * 0.4, CELL * 0.4, CELL * 0.4);
-      const mat = new THREE.MeshBasicMaterial({ color: '#1b3556', transparent: true, opacity: 0.9 });
+      const mat = new THREE.MeshBasicMaterial({ color: '#5e82ae', transparent: true, opacity: 0.9 });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(w.x, w.y, w.z);
       this.visuals.add(mesh);
     }
-  }
-
-  private addMarker(index: number, color: string, scale = 1): void {
-    const [x, y, z] = tuple(index);
-    const w = toWorld(x, y, z);
-    const marker = makeMarker(color);
-    marker.position.set(w.x, w.y, w.z);
-    marker.rotation.x = Math.PI / 2;
-    marker.scale.setScalar(scale);
-    this.visuals.add(marker);
   }
 
   private clearVisuals(): void {
@@ -147,5 +165,9 @@ export class PieceBoard {
         else mat.dispose();
       }
     }
+  }
+
+  private notify(): void {
+    this.callbacks.onChange();
   }
 }
