@@ -1,14 +1,15 @@
 import { N } from '../engine/config';
 import { label } from '../engine/coords';
+import type { PieceHudState } from '../piece/board';
 
 export interface HudCallbacks {
   onPreset: (preset: '1' | '2' | '3' | 'r') => void;
-  onLabToggle: () => void;
 }
 
 export class Hud {
   private readonly root: HTMLElement;
   private readonly hoverReadout: HTMLElement;
+  private readonly pieceReadout: HTMLElement;
   private readonly fpsEl: HTMLElement;
   private frames = 0;
   private lastFpsUpdate = performance.now();
@@ -20,6 +21,9 @@ export class Hud {
 
     this.hoverReadout = this.panel('hover-readout');
     this.hoverReadout.innerHTML = this.hoverHtml(null, 0, 0);
+
+    this.pieceReadout = this.panel('piece-readout');
+    this.pieceReadout.innerHTML = this.pieceHtml(null);
 
     this.fpsEl = this.panel('fps');
     this.fpsEl.textContent = '-- fps';
@@ -39,15 +43,8 @@ export class Hud {
     const hint = this.panel('controls-hint');
     hint.innerHTML =
       '<b>Orbit</b> drag &middot; <b>Zoom</b> scroll &middot; <b>Pan</b> shift+drag<br>' +
-      '<b>Fly</b> WASD QE &middot; <b>Depth</b> Alt+scroll or [ ]<br>' +
-      '<b>Views</b> 1 2 3 &middot; <b>Reset</b> R';
-
-    const labToggle = document.createElement('button');
-    labToggle.id = 'lab-toggle';
-    labToggle.className = 'hud-panel';
-    labToggle.textContent = 'Piece Lab [L]';
-    labToggle.addEventListener('click', () => callbacks.onLabToggle());
-    this.root.appendChild(labToggle);
+      '<b>Fly</b> WASD QE &middot; <b>Views</b> 1 2 3 &middot; <b>Reset</b> R<br>' +
+      '<b>Place/move</b> click &middot; <b>Blocker</b> shift+click &middot; <b>Clear</b> backspace';
   }
 
   private panel(id: string): HTMLElement {
@@ -60,20 +57,34 @@ export class Hud {
 
   private hoverHtml(index: number | null, depth: number, hitCount: number): string {
     if (index === null) {
-      return '<div class="title">Hover</div><div class="coord">--</div><div>depth --/--</div>';
+      return '<div class="title">Hover</div><div class="coord">--</div>';
     }
     const x = index % N;
     const y = Math.floor(index / N) % N;
     const z = Math.floor(index / (N * N));
-    return (
+    let html =
       '<div class="title">Hover</div>' +
-      `<div class="coord">(${x}, ${y}, ${z})  &middot;  ${label(index)}</div>` +
-      `<div>depth ${depth + 1} / ${hitCount}</div>`
+      `<div class="coord">(${x}, ${y}, ${z})  &middot;  ${label(index)}</div>`;
+    if (hitCount > 1) html += `<div>${depth + 1} / ${hitCount}</div>`;
+    return html;
+  }
+
+  private pieceHtml(state: PieceHudState | null): string {
+    if (!state) return '<div class="title">Piece</div><div class="coord">--</div>';
+    const [x, y, z] = state.cell;
+    return (
+      '<div class="title">Piece</div>' +
+      `<div class="coord">${state.name}  (${x}, ${y}, ${z})</div>` +
+      `<div>reach  ${state.reachable} cells</div>`
     );
   }
 
   setHover(index: number | null, depth: number, hitCount: number): void {
     this.hoverReadout.innerHTML = this.hoverHtml(index, depth, hitCount);
+  }
+
+  setPiece(state: PieceHudState | null): void {
+    this.pieceReadout.innerHTML = this.pieceHtml(state);
   }
 
   tickFps(): void {

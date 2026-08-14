@@ -5,7 +5,6 @@ import { toWorld } from '../engine/coords';
 export interface LatticeBundle {
   group: THREE.Group;
   cellMarkers: THREE.InstancedMesh;
-  pickCollider: THREE.InstancedMesh;
 }
 
 function makeTextSprite(text: string, color: string, sizePx = 48): THREE.Sprite {
@@ -92,26 +91,6 @@ function buildCellMarkers(): THREE.InstancedMesh {
   return mesh;
 }
 
-function buildPickCollider(): THREE.InstancedMesh {
-  const geometry = new THREE.BoxGeometry(CELL * 0.9, CELL * 0.9, CELL * 0.9);
-  const material = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
-  const mesh = new THREE.InstancedMesh(geometry, material, CELLS);
-
-  const dummy = new THREE.Object3D();
-  for (let i = 0; i < CELLS; i++) {
-    const x = i % N;
-    const y = Math.floor(i / N) % N;
-    const z = Math.floor(i / (N * N));
-    const w = toWorld(x, y, z);
-    dummy.position.set(w.x, w.y, w.z);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  // keep in scene (not hidden via visible=false) so raycasting still finds it
-  return mesh;
-}
-
 function buildAxisRuler(axis: 'x' | 'y' | 'z', color: string): THREE.Group {
   const group = new THREE.Group();
   const points: THREE.Vector3[] = [];
@@ -155,8 +134,5 @@ export function buildLattice(): LatticeBundle {
   const cellMarkers = buildCellMarkers();
   group.add(cellMarkers);
 
-  const pickCollider = buildPickCollider();
-  group.add(pickCollider);
-
-  return { group, cellMarkers, pickCollider };
+  return { group, cellMarkers };
 }

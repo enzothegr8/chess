@@ -97,7 +97,6 @@ export class CameraController {
       'wheel',
       (e) => {
         e.preventDefault();
-        if (e.altKey) return; // reserved for hover-depth cycling, see input/picking.ts
         this.radius = THREE.MathUtils.clamp(this.radius * (1 + e.deltaY * 0.001), 1.5, 200);
       },
       { passive: false }

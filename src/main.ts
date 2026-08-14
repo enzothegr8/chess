@@ -1,10 +1,10 @@
 import { createScene } from './render/scene';
 import { CameraController } from './render/camera';
 import { buildLattice } from './render/lattice';
-import { HoverHighlight, GuidePlanes } from './render/highlights';
+import { HoverHighlight, GuideLines } from './render/highlights';
 import { Picker } from './input/picking';
 import { Hud } from './ui/hud';
-import { PieceLab } from './lab/lab';
+import { PieceBoard } from './piece/board';
 import { xOf, yOf, zOf } from './engine/coords';
 
 const app = document.getElementById('app')!;
@@ -16,21 +16,13 @@ const lattice = buildLattice();
 scene.add(lattice.group);
 
 const hover = new HoverHighlight(lattice.cellMarkers);
-const guidePlanes = new GuidePlanes();
-scene.add(guidePlanes.group);
+const guideLines = new GuideLines();
+scene.add(guideLines.group);
 
-const picker = new Picker(canvas, cameraController.camera, lattice.pickCollider);
+const picker = new Picker(canvas, cameraController.camera);
 
-let labOpen = false;
-const lab = new PieceLab(app);
-lab.visuals.visible = false;
-scene.add(lab.visuals);
-
-function setLabOpen(open: boolean): void {
-  labOpen = open;
-  lab.controls.panel.classList.toggle('open', open);
-  lab.visuals.visible = open;
-}
+const board = new PieceBoard();
+scene.add(board.visuals);
 
 const hud = new Hud(app, {
   onPreset: (preset) => {
@@ -39,17 +31,22 @@ const hud = new Hud(app, {
     if (preset === '3') cameraController.snapTop();
     if (preset === 'r') cameraController.reset();
   },
-  onLabToggle: () => setLabOpen(!labOpen),
 });
+hud.setPiece(board.getHudState());
 
 canvas.addEventListener('click', (e) => {
-  if (!labOpen) return;
   const state = picker.update();
-  if (state.index !== null) lab.handleClick(state.index, e.shiftKey);
+  if (state.index !== null) {
+    board.handleClick(state.index, e.shiftKey);
+    hud.setPiece(board.getHudState());
+  }
 });
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'KeyL') setLabOpen(!labOpen);
+  if (e.code === 'Backspace') {
+    board.clear();
+    hud.setPiece(board.getHudState());
+  }
 });
 
 let last = performance.now();
@@ -63,9 +60,9 @@ function frame(now: number): void {
   hover.setHover(hoverState.index);
   hud.setHover(hoverState.index, hoverState.depth, hoverState.hitCount);
   if (hoverState.index !== null) {
-    guidePlanes.show(xOf(hoverState.index), yOf(hoverState.index), zOf(hoverState.index));
+    guideLines.show(xOf(hoverState.index), yOf(hoverState.index), zOf(hoverState.index));
   } else {
-    guidePlanes.hide();
+    guideLines.hide();
   }
 
   hud.tickFps();
