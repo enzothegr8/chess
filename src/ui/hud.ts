@@ -19,7 +19,7 @@ export class Hud {
     container.appendChild(this.root);
 
     this.statusReadout = this.panel('status-readout');
-    this.setStatus(null, 0, 0, null);
+    this.setStatus(null, null, 0, 0, null);
 
     this.fpsEl = this.panel('fps');
     this.fpsEl.textContent = '-- fps';
@@ -39,8 +39,8 @@ export class Hud {
     const hint = this.panel('controls-hint');
     hint.innerHTML =
       '<b>Orbit</b> drag &middot; <b>Zoom</b> scroll &middot; <b>Pan</b> shift+drag &middot; <b>Views</b> 1 2 3 &middot; <b>Reset</b> R<br>' +
-      '<b>Cursor</b> W A S D, &uarr; &darr; &middot; <b>Place/move</b> enter/space<br>' +
-      '<b>Blocker</b> shift+click &middot; <b>Clear</b> backspace';
+      '<b>Select</b> click &middot; <b>Move sel.</b> W A S D, &uarr; &darr; &middot; <b>Deselect</b> esc<br>' +
+      '<b>Place/move piece</b> enter/space &middot; <b>Blocker</b> shift+click &middot; <b>Clear</b> backspace';
   }
 
   private panel(id: string): HTMLElement {
@@ -51,29 +51,31 @@ export class Hud {
     return el;
   }
 
-  setStatus(cellIndex: number | null, depth: number, hitCount: number, piece: PieceHudState | null): void {
-    let html = '<div class="status-row"><span class="status-label">cell</span>';
-    if (cellIndex === null) {
-      html += '<span class="status-val">--</span></div>';
-    } else {
-      const x = cellIndex % N;
-      const y = Math.floor(cellIndex / N) % N;
-      const z = Math.floor(cellIndex / (N * N));
-      html += `<span class="status-val">(${x}, ${y}, ${z})  ${label(cellIndex)}</span>`;
-      if (hitCount > 1) html += `<span class="status-sub">${depth + 1} / ${hitCount}</span>`;
-      html += '</div>';
-    }
+  private coordRow(labelText: string, index: number | null, suffix = ''): string {
+    const value = index === null ? '--' : `(${index % N}, ${Math.floor(index / N) % N}, ${Math.floor(index / (N * N))})  ${label(index)}`;
+    return (
+      `<div class="status-row"><span class="status-label">${labelText}</span>` +
+      `<span class="status-val">${value}</span>${suffix}</div>`
+    );
+  }
 
-    if (piece) {
-      const [px, py, pz] = piece.cell;
-      html +=
-        '<div class="status-row"><span class="status-label">piece</span>' +
-        `<span class="status-val">${piece.name}  (${px}, ${py}, ${pz})</span></div>` +
-        '<div class="status-row"><span class="status-label">reach</span>' +
-        `<span class="status-val">${piece.reachable} cells</span></div>`;
-    } else {
-      html += '<div class="status-row"><span class="status-label">piece</span><span class="status-val">--</span></div>';
-    }
+  setStatus(
+    hoveredCell: number | null,
+    selectedCell: number | null,
+    depth: number,
+    hitCount: number,
+    piece: PieceHudState | null
+  ): void {
+    const depthSuffix = hitCount > 1 ? `<span class="status-sub">${depth + 1} / ${hitCount}</span>` : '';
+
+    let html = this.coordRow('hovered', hoveredCell, depthSuffix);
+    html += this.coordRow('selected', selectedCell);
+
+    const pieceVal = piece ? `${piece.name}  (${piece.cell[0]}, ${piece.cell[1]}, ${piece.cell[2]})` : '--';
+    const reachVal = piece ? `${piece.reachable} cells` : '--';
+    html +=
+      `<div class="status-row"><span class="status-label">piece</span><span class="status-val">${pieceVal}</span></div>` +
+      `<div class="status-row"><span class="status-label">reach</span><span class="status-val">${reachVal}</span></div>`;
 
     this.statusReadout.innerHTML = html;
   }

@@ -7,7 +7,6 @@ import { buildCellPositions } from './render/cellPositions';
 import { Picker } from './input/picking';
 import { Hud } from './ui/hud';
 import { PieceBoard } from './piece/board';
-import { N } from './engine/config';
 import { inBounds, toIndex, tuple, xOf, yOf, zOf } from './engine/coords';
 
 const app = document.getElementById('app')!;
@@ -24,7 +23,11 @@ scene.add(nodeField.group);
 const guideLines = new GuideLines();
 scene.add(guideLines.group);
 
-let activeCell: number | null = null;
+// Two independent cell references: hoveredCell is transient and follows the
+// pointer; selectedCell persists until another click or Escape. They may
+// coincide, differ, or either may be null — neither drives the other.
+let hoveredCell: number | null = null;
+let selectedCell: number | null = null;
 let depthInfo = { depth: 0, hitCount: 0 };
 
 const hud = new Hud(app, {
@@ -39,22 +42,28 @@ const hud = new Hud(app, {
 const board = new PieceBoard({
   onChange: () => {
     nodeField.setBoardState(board.reachable, board.capturable, board.getPieceCell());
-    hud.setStatus(activeCell, depthInfo.depth, depthInfo.hitCount, board.getHudState());
+    updateHud();
   },
 });
 scene.add(board.visuals);
 
-function setActiveCell(index: number | null): void {
-  activeCell = index;
-  nodeField.setActiveCell(index);
+function updateHud(): void {
+  hud.setStatus(hoveredCell, selectedCell, depthInfo.depth, depthInfo.hitCount, board.getHudState());
+}
+
+function setSelected(index: number | null): void {
+  selectedCell = index;
+  nodeField.setSelectedCell(index);
   if (index !== null) guideLines.show(xOf(index), yOf(index), zOf(index));
   else guideLines.hide();
-  hud.setStatus(activeCell, depthInfo.depth, depthInfo.hitCount, board.getHudState());
+  updateHud();
 }
 
 new Picker(canvas, cameraController.camera, positions, (state) => {
   depthInfo = { depth: state.depth, hitCount: state.hitCount };
-  setActiveCell(state.index);
+  hoveredCell = state.index;
+  nodeField.setHoveredCell(hoveredCell);
+  updateHud();
 });
 
 function isTextInputFocused(): boolean {
@@ -62,21 +71,18 @@ function isTextInputFocused(): boolean {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 }
 
-function centerCellIndex(): number {
-  const c = Math.floor(N / 2);
-  return toIndex(c, c, c);
-}
-
+// Picking is never filtered: hoveredCell always reflects the nearest node to
+// the cursor across all N^3 cells, regardless of reachability or any other
+// display state, so a click here can select any node at any time.
 canvas.addEventListener('click', (e) => {
-  if (activeCell === null) return;
+  if (hoveredCell === null) return;
 
   if (e.shiftKey) {
-    board.toggleBlocker(activeCell);
-  } else if (activeCell === board.getPieceCell()) {
-    board.removePiece();
-  } else {
-    board.activateCell(activeCell);
+    board.toggleBlocker(hoveredCell);
+    return;
   }
+
+  setSelected(selectedCell === hoveredCell ? null : hoveredCell);
 });
 
 const NAV_DELTA: Record<string, [number, number, number]> = {
@@ -91,6 +97,11 @@ const NAV_DELTA: Record<string, [number, number, number]> = {
 window.addEventListener('keydown', (e) => {
   if (isTextInputFocused()) return;
 
+  if (e.code === 'Escape') {
+    setSelected(null);
+    return;
+  }
+
   if (e.code === 'Backspace') {
     board.clear();
     return;
@@ -98,23 +109,21 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code in NAV_DELTA) {
     e.preventDefault();
-    if (activeCell === null) {
-      setActiveCell(centerCellIndex());
-      return;
-    }
+    if (selectedCell === null) return; // keys act on the selection only, never implicitly
+
     const [dx, dy, dz] = NAV_DELTA[e.code];
-    const [bx, by, bz] = tuple(activeCell);
+    const [bx, by, bz] = tuple(selectedCell);
     const nx = bx + dx;
     const ny = by + dy;
     const nz = bz + dz;
     if (!inBounds(nx, ny, nz)) return; // clamp at the lattice bounds, no wrap
-    setActiveCell(toIndex(nx, ny, nz));
+    setSelected(toIndex(nx, ny, nz));
     return;
   }
 
   if (e.code === 'Enter' || e.code === 'Space') {
     e.preventDefault();
-    if (activeCell !== null) board.activateCell(activeCell);
+    if (selectedCell !== null) board.activateCell(selectedCell);
   }
 });
 

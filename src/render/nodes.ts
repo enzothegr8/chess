@@ -4,27 +4,32 @@ import { N, CELL, CELLS } from '../engine/config';
 const IDLE = 0;
 const REACHABLE = 1;
 const CAPTURABLE = 2;
-const ACTIVE = 3;
-const OCCUPIED = 4;
+const HOVERED = 3;
+const SELECTED = 4;
+const OCCUPIED = 5;
 
 const STATE_COLOR = [
-  new THREE.Color('#5e82ae'), // idle          --lattice
+  new THREE.Color('#a8b0bc'), // idle          --lattice
   new THREE.Color('#38e1ff'), // reachable     --holo
   new THREE.Color('#ff3b6b'), // capturable    --alarm
-  new THREE.Color('#eafeff'), // active        --holo-core
+  new THREE.Color('#eafeff'), // hovered       --holo-core
+  new THREE.Color('#eafeff'), // selected      --holo-core
   new THREE.Color('#eafeff'), // occupied      --holo-core
 ];
-const STATE_SCALE = [1.0, 1.4, 1.4, 1.8, 2.0];
+const STATE_SCALE = [1.0, 1.4, 1.4, 1.5, 1.8, 2.0];
 
 const BG_COLOR = new THREE.Color('#04060f');
-const NEAR_OPACITY = 1.0;
-const FAR_OPACITY = 0.5;
+const IDLE_NEAR_OPACITY = 0.6;
+const IDLE_FAR_OPACITY = 0.3;
 
 /**
  * Every lattice node in one InstancedMesh (one draw call). Node state
- * (idle/reachable/capturable/active/occupied) drives color and scale;
- * camera-relative depth further blends each node's color toward the
- * background so the far wall of the cube reads as further away.
+ * (idle/reachable/capturable/hovered/selected/occupied) drives color and
+ * scale — where states overlap, occupied beats selected beats hovered
+ * beats capturable beats reachable beats idle. Only idle nodes fade with
+ * camera-relative depth, toward the background, so the far wall of the
+ * cube reads as further away without dimming anything the user actually
+ * cares about.
  */
 export class NodeField {
   readonly group = new THREE.Group();
@@ -32,8 +37,9 @@ export class NodeField {
   private readonly occupiedRing: THREE.Mesh;
 
   private readonly boardState = new Uint8Array(CELLS); // reachable/capturable/occupied/idle only
-  private readonly cellState = new Uint8Array(CELLS); // boardState + the active-cell overlay
-  private activeCell: number | null = null;
+  private readonly cellState = new Uint8Array(CELLS); // boardState + hover/selection overlays
+  private hoveredCell: number | null = null;
+  private selectedCell: number | null = null;
 
   private readonly dummy = new THREE.Object3D();
   private readonly blended = new THREE.Color();
@@ -85,28 +91,38 @@ export class NodeField {
       this.occupiedRing.visible = false;
     }
 
-    this.cellState.set(this.boardState);
-    if (this.activeCell !== null) {
-      this.cellState[this.activeCell] = Math.max(this.cellState[this.activeCell], ACTIVE);
-    }
-
-    for (let i = 0; i < CELLS; i++) this.writeMatrix(i);
+    for (let i = 0; i < CELLS; i++) this.refresh(i);
     this.mesh.instanceMatrix.needsUpdate = true;
   }
 
-  /** Cursor state: called on every hover change or nav-key press. O(1) — touches at most two cells. */
-  setActiveCell(next: number | null): void {
-    const previous = this.activeCell;
-    if (previous !== null) {
-      this.cellState[previous] = this.boardState[previous];
-      this.writeMatrix(previous);
-    }
-    if (next !== null) {
-      this.cellState[next] = Math.max(this.boardState[next], ACTIVE);
-      this.writeMatrix(next);
-    }
-    this.activeCell = next;
+  /** Transient: follows the mouse. Touches at most two cells. */
+  setHoveredCell(next: number | null): void {
+    const previous = this.hoveredCell;
+    this.hoveredCell = next;
+    if (previous !== null) this.refresh(previous);
+    if (next !== null && next !== previous) this.refresh(next);
     this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Persists until changed. Touches at most two cells. */
+  setSelectedCell(next: number | null): void {
+    const previous = this.selectedCell;
+    this.selectedCell = next;
+    if (previous !== null) this.refresh(previous);
+    if (next !== null && next !== previous) this.refresh(next);
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private computeState(i: number): number {
+    let s = this.boardState[i];
+    if (i === this.hoveredCell) s = Math.max(s, HOVERED);
+    if (i === this.selectedCell) s = Math.max(s, SELECTED);
+    return s;
+  }
+
+  private refresh(i: number): void {
+    this.cellState[i] = this.computeState(i);
+    this.writeMatrix(i);
   }
 
   private writeMatrix(i: number): void {
@@ -116,7 +132,7 @@ export class NodeField {
     this.mesh.setMatrixAt(i, this.dummy.matrix);
   }
 
-  /** Per-frame: blend every node's color toward the background by camera-relative depth. */
+  /** Per-frame: fade idle nodes toward the background by camera-relative depth. */
   update(camera: THREE.Camera): void {
     camera.getWorldDirection(this.camDir);
     const camPos = camera.position;
@@ -139,15 +155,21 @@ export class NodeField {
     const span = far - near || 1;
 
     for (let i = 0; i < CELLS; i++) {
+      const state = this.cellState[i];
+
+      if (state !== IDLE) {
+        this.mesh.setColorAt(i, STATE_COLOR[state]);
+        continue;
+      }
+
       const px = this.positions[i * 3];
       const py = this.positions[i * 3 + 1];
       const pz = this.positions[i * 3 + 2];
-
       const d = (px - camPos.x) * this.camDir.x + (py - camPos.y) * this.camDir.y + (pz - camPos.z) * this.camDir.z;
       const t = THREE.MathUtils.clamp((d - near) / span, 0, 1);
-      const opacity = THREE.MathUtils.lerp(NEAR_OPACITY, FAR_OPACITY, t);
+      const opacity = THREE.MathUtils.lerp(IDLE_NEAR_OPACITY, IDLE_FAR_OPACITY, t);
 
-      this.blended.copy(BG_COLOR).lerp(STATE_COLOR[this.cellState[i]], opacity);
+      this.blended.copy(BG_COLOR).lerp(STATE_COLOR[IDLE], opacity);
       this.mesh.setColorAt(i, this.blended);
     }
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;

@@ -45,6 +45,12 @@ export class Picker {
       this.recompute(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
     });
 
+    domElement.addEventListener('pointerleave', () => {
+      this.candCount = 0;
+      this.cycleIndex = 0;
+      this.emit();
+    });
+
     window.addEventListener('keydown', (e) => {
       if (isTextInputFocused()) return;
       if (e.code === 'BracketRight') this.cycle(1);

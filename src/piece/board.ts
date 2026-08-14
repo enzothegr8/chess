@@ -57,12 +57,6 @@ export class PieceBoard {
     }
   }
 
-  removePiece(): void {
-    if (this.pieceCell === null) return;
-    this.pieceCell = null;
-    this.recompute();
-  }
-
   toggleBlocker(index: number): void {
     if (index === this.pieceCell) return;
     if (this.blockers.has(index)) this.blockers.delete(index);
@@ -148,7 +142,7 @@ export class PieceBoard {
       const [x, y, z] = tuple(b);
       const w = toWorld(x, y, z);
       const geo = new THREE.BoxGeometry(CELL * 0.4, CELL * 0.4, CELL * 0.4);
-      const mat = new THREE.MeshBasicMaterial({ color: '#5e82ae', transparent: true, opacity: 0.9 });
+      const mat = new THREE.MeshBasicMaterial({ color: '#a8b0bc', transparent: true, opacity: 0.9 });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(w.x, w.y, w.z);
       this.visuals.add(mesh);
